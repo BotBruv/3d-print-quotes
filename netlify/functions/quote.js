@@ -119,7 +119,7 @@ async function sendOwnerEmail(quote, fileLink, resendKey, ownerEmail) {
   }, {
     from: 'quotes@highlyobtainable.com',
     to: ownerEmail,
-    subject: 'New 3D Print Quote - ' + quote.firstName + ' ' + quote.lastName + ' ($' + quote.total + ')',
+    subject: 'Highly Obtainable | New 3D Print Quote - ' + quote.firstName + ' ' + quote.lastName + ' ($' + quote.total + ')',
     html: html
   });
 }
