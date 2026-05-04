@@ -110,7 +110,7 @@ async function sendOwnerEmail(quote, fileLink, resendKey, ownerEmail) {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + resendKey, 'Content-Type': 'application/json' }
   }, {
-    from: 'onboarding@resend.dev',
+    from: 'quotes@highlyobtainable.com',
     to: ownerEmail,
     subject: 'New 3D Print Quote - ' + quote.firstName + ' ' + quote.lastName + ' ($' + quote.total + ')',
     html: html
@@ -142,7 +142,7 @@ async function sendCustomerEmail(quote, resendKey, ownerEmail) {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + resendKey, 'Content-Type': 'application/json' }
   }, {
-    from: 'onboarding@resend.dev',
+    from: 'quotes@highlyobtainable.com',
     to: quote.email,
     reply_to: ownerEmail,
     subject: 'Your 3D print quote - $' + quote.total,
