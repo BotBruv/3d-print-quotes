@@ -152,7 +152,7 @@ async function sendCustomerEmail(quote, resendKey, ownerEmail) {
     from: 'quotes@highlyobtainable.com',
     to: quote.email,
     reply_to: ownerEmail,
-    subject: 'Your 3D print quote - $' + quote.total,
+    subject: 'Highly Obtainable | Your 3D print quote - $' + quote.total,
     html: html
   });
 }
