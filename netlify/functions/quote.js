@@ -1,7 +1,5 @@
 const https = require('https');
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
 function jsonRequest(options, body) {
   return new Promise(function(resolve, reject) {
     var req = https.request(options, function(res) {
@@ -34,9 +32,22 @@ function binaryRequest(options, buffer) {
   });
 }
 
-// ── Dropbox ───────────────────────────────────────────────────────────────────
+async function getDropboxToken(appKey, appSecret, refreshToken) {
+  var res = await jsonRequest({
+    hostname: 'api.dropboxapi.com',
+    path: '/oauth2/token',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + Buffer.from(appKey + ':' + appSecret).toString('base64')
+    }
+  }, 'grant_type=refresh_token&refresh_token=' + refreshToken);
+  if(!res.body.access_token) throw new Error('Failed to get Dropbox access token: ' + JSON.stringify(res.body));
+  return res.body.access_token;
+}
 
-async function uploadDropbox(fileBuffer, fileName, token) {
+async function uploadDropbox(fileBuffer, fileName, appKey, appSecret, refreshToken) {
+  var token = await getDropboxToken(appKey, appSecret, refreshToken);
   var ts = new Date().toISOString().replace(/[:.]/g, '-');
   var safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
   var path = '/3D-Print-Quotes/' + ts + '_' + safeName;
@@ -55,7 +66,6 @@ async function uploadDropbox(fileBuffer, fileName, token) {
 
   if(upRes.status !== 200) throw new Error('Dropbox upload failed: ' + upRes.status);
 
-  // Create shared link
   var linkRes = await jsonRequest({
     hostname: 'api.dropboxapi.com',
     path: '/2/sharing/create_shared_link_with_settings',
@@ -65,7 +75,6 @@ async function uploadDropbox(fileBuffer, fileName, token) {
 
   if(linkRes.status === 200) return linkRes.body.url.replace('?dl=0', '?dl=1');
 
-  // Link may already exist
   var existRes = await jsonRequest({
     hostname: 'api.dropboxapi.com',
     path: '/2/sharing/list_shared_links',
@@ -78,8 +87,6 @@ async function uploadDropbox(fileBuffer, fileName, token) {
   }
   throw new Error('Could not get Dropbox link');
 }
-
-// ── Resend emails ─────────────────────────────────────────────────────────────
 
 async function sendOwnerEmail(quote, fileLink, resendKey, ownerEmail) {
   var html =
@@ -150,8 +157,6 @@ async function sendCustomerEmail(quote, resendKey, ownerEmail) {
   });
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
-
 exports.handler = async function(event) {
   var headers = {
     'Access-Control-Allow-Origin': '*',
@@ -173,21 +178,23 @@ exports.handler = async function(event) {
     var fileBase64 = payload.file;
     var fileName = payload.fileName;
 
-    var DROPBOX_TOKEN = process.env.DROPBOX_TOKEN;
-    var RESEND_KEY    = process.env.RESEND_KEY;
-    var OWNER_EMAIL   = process.env.OWNER_EMAIL;
+    var DROPBOX_APP_KEY       = process.env.DROPBOX_APP_KEY;
+    var DROPBOX_APP_SECRET    = process.env.DROPBOX_APP_SECRET;
+    var DROPBOX_REFRESH_TOKEN = process.env.DROPBOX_REFRESH_TOKEN;
+    var RESEND_KEY            = process.env.RESEND_KEY;
+    var OWNER_EMAIL           = process.env.OWNER_EMAIL;
 
     // 1. Upload file to Dropbox
     var fileLink = null;
     if(fileBase64 && fileBase64.length > 10) {
       var fileBuffer = Buffer.from(fileBase64, 'base64');
-      fileLink = await uploadDropbox(fileBuffer, fileName, DROPBOX_TOKEN);
+      fileLink = await uploadDropbox(fileBuffer, fileName, DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN);
     }
 
-    // 2. Email owner with all details + file link
+    // 2. Email owner
     await sendOwnerEmail(quote, fileLink || '(no file)', RESEND_KEY, OWNER_EMAIL);
 
-    // 3. Email customer confirmation
+    // 3. Email customer
     await sendCustomerEmail(quote, RESEND_KEY, OWNER_EMAIL);
 
     return {
